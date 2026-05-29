@@ -66,45 +66,37 @@ One simple first run is:
 
 ### `/antigravity:review`
 
-Runs a normal Antigravity review on your current work.
+Performs a standard, read-only code review on your local git state.
+
+Use it when you want a second pass on uncommitted working-tree changes before you commit, or when you want to audit everything on your feature branch relative to `main` before opening a PR.
+
+How it works: the plugin collects your git status, staged and unstaged diffs, and untracked file contents. For small changesets the full diff is embedded directly in the prompt; for larger ones the model reads files via read-only tool calls inside its sandbox. The output is free-form Markdown covering logic bugs, missing edge cases, and safety concerns.
 
 > [!NOTE]
-> Code review especially for multi-file changes might take a while. It's generally recommended to run it in the background.
-
-Use it when you want:
-
-- a review of your current uncommitted changes
-- a review of your branch compared to a base branch like `main`
-
-Use `--base <ref>` for branch review. Also supports `--wait`, `--background`, and `--focus <text>`.
-
-Examples:
+> Multi-file reviews can take a while. Running in the background is usually the right call unless the change is tiny.
 
 ```bash
 /antigravity:review
 /antigravity:review --base main
 /antigravity:review --background
-/antigravity:review --focus "check error handling"
+/antigravity:review --focus "validate error handling and retries"
 ```
 
-This command is read-only and will not perform any changes.
+Flags:
+- `--scope <working-tree|branch|auto>` — limit the review to uncommitted edits or branch differences (default: `auto`)
+- `--base <ref>` — compare against a specific branch or commit (e.g. `--base main`)
+- `--focus <text>` — direct attention to a specific area or concern
+- `--wait` / `--background` — run in the foreground or as a detached background job
+
+This command is read-only and will not modify any files.
 
 ### `/antigravity:adversarial-review`
 
-Runs a **steerable** review that questions the chosen implementation and design.
+Runs a challenge review that actively questions the chosen implementation and design rather than just looking for defects.
 
-It can be used to pressure-test assumptions, tradeoffs, failure modes, and whether a different approach would have been safer or simpler.
+Use it when you want to pressure-test the direction, not just the code. It is well-suited for changes that touch authentication boundaries, data loss paths, schema migrations, lock ordering, or retry logic — anywhere the cost of a wrong design is high.
 
-It uses the same review target selection as `/antigravity:review`, including `--base <ref>` for branch review.
-Also supports `--wait`, `--background`, and `--focus <text>`.
-
-Use it when you want:
-
-- a review before shipping that challenges the direction, not just the code details
-- review focused on design choices, tradeoffs, hidden assumptions, and alternative approaches
-- pressure-testing around specific risk areas like auth, data loss, rollback, race conditions, or reliability
-
-Examples:
+It uses the same git context extraction as `/antigravity:review` but enforces a structured JSON output contract. The result is rendered as a verdict (`approve` / `needs-attention`), a summary, and a list of findings sorted by severity (`critical`, `high`, `medium`, `low`), each with a file location, confidence score, and concrete recommendation.
 
 ```bash
 /antigravity:adversarial-review
@@ -112,24 +104,20 @@ Examples:
 /antigravity:adversarial-review --background --focus "look for race conditions"
 ```
 
-This command is read-only. It does not fix code.
+Supports all the same flags as `/antigravity:review`. This command is read-only.
 
 ### `/antigravity:rescue`
 
-Hands a task to Antigravity through the `antigravity:antigravity-rescue` subagent.
+Delegates a coding, debugging, or investigative task to Antigravity through the `antigravity:antigravity-rescue` subagent.
 
-Use it when you want Antigravity to:
+Use it when you want Antigravity to investigate a regression, attempt a fix, continue a previous run, or take a second implementation pass when Claude Code is stuck.
 
-- investigate a bug
-- try a fix
-- continue a previous Antigravity task
+Unlike the review commands, rescue defaults to **write-capable mode** — `agy` can modify files and write patches directly into your repository. The task runs headlessly through the local `agy` runtime.
+
+If you omit `--resume` and `--fresh`, the plugin checks for a resumable conversation from this session and offers to continue it or start fresh.
 
 > [!NOTE]
-> Depending on the task, these tasks might take a long time and it's generally recommended to run in the background.
-
-It supports `--background`, `--wait`, `--resume`, and `--fresh`. If you omit `--resume` and `--fresh`, the plugin can offer to continue the latest rescue thread for this repo.
-
-Examples:
+> Complex tasks can take a long time. Running in the background is usually the right call, especially for multi-step investigations or fixes.
 
 ```bash
 /antigravity:rescue investigate why the tests started failing
@@ -138,65 +126,78 @@ Examples:
 /antigravity:rescue --background investigate the regression
 ```
 
-You can also just ask for a task to be delegated to Antigravity:
+You can also delegate conversationally:
 
 ```text
 Ask Antigravity to redesign the database connection to be more resilient.
 ```
 
+Flags:
+- `--background` — launch as a detached background job; check progress with `/antigravity:status`
+- `--wait` — run in the foreground and block until complete (default)
+- `--resume` — continue the previous Antigravity conversation for this repo without asking
+- `--fresh` — start a new conversation without asking
+
 ### `/antigravity:status`
 
-Shows running and recent Antigravity jobs for the current repository.
-
-Examples:
+Shows active and recently completed Antigravity jobs for the current repository.
 
 ```bash
 /antigravity:status
 /antigravity:status task-abc123
+/antigravity:status --wait
 ```
 
-Use it to:
+Without a job ID, renders a compact table of current and recent jobs: Job ID, kind, status, phase, elapsed time, conversation ID, and quick-action commands.
 
-- check progress on background work
-- see the latest completed job
-- confirm whether a task is still running
+With a job ID, shows the full detail view: active phase, run duration, log location, and progress lines.
+
+`--wait` polls until all active jobs complete before returning the final status table.
 
 ### `/antigravity:result`
 
-Shows the final stored Antigravity output for a finished job.
-
-Examples:
+Retrieves the complete stored output for a finished job.
 
 ```bash
 /antigravity:result
 /antigravity:result task-abc123
 ```
 
+Without a job ID, returns the most recently completed job. With a job ID, returns that specific job's full result — verdict, summary, findings, artifacts, and any error messages — exactly as produced, without summarisation.
+
+For review jobs, also shows the conversation ID so you can continue the work directly in `agy` with `agy --conversation <uuid>`.
+
 ### `/antigravity:cancel`
 
-Cancels an active background Antigravity job.
-
-Examples:
+Cancels an active background job.
 
 ```bash
 /antigravity:cancel
 /antigravity:cancel task-abc123
 ```
 
+Terminates the entire process group (killing `agy` and any child processes), then marks the job as cancelled in the workspace state. Without a job ID, cancels the only active job for this session; if multiple are running, a job ID is required.
+
 ### `/antigravity:setup`
 
-Checks whether Antigravity is installed and authenticated.
+Checks whether the local Antigravity CLI is installed, authenticated, and ready to use.
 
-You can also use `/antigravity:setup` to manage the optional review gate.
+```bash
+/antigravity:setup
+```
 
-#### Enabling review gate
+Inspects: Node.js availability, `agy` binary presence, and Google OAuth credentials (`~/.gemini/oauth_creds.json` token validity and `~/.gemini/google_accounts.json` active account). Reports diagnostic status and lists the next steps if anything is missing or expired.
+
+If `agy` is installed but not authenticated, follow the prompt to run `agy` once interactively to complete Google OAuth.
+
+#### Review gate
 
 ```bash
 /antigravity:setup --enable-review-gate
 /antigravity:setup --disable-review-gate
 ```
 
-When the review gate is enabled, the plugin uses a `Stop` hook to run a targeted Antigravity review based on Claude's response. If that review finds issues, the stop is blocked so Claude can address them first.
+When the review gate is enabled, the plugin registers a `Stop` hook that runs a targeted Antigravity review of Claude's last response before allowing the session to end. If the review finds blocking issues, the stop is held so Claude can address them first.
 
 > [!WARNING]
 > The review gate can create a long-running Claude/Antigravity loop and may drain usage limits quickly. Only enable it when you plan to actively monitor the session.
