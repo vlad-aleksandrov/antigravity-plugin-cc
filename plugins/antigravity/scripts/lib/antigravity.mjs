@@ -17,6 +17,18 @@ export async function getAntigravityAuthStatus() {
     return { loggedIn: false, requiresAuth: true, account: null };
   }
   try {
+    const creds = JSON.parse(fs.readFileSync(credsFile, "utf8"));
+    const expiry = creds?.expiry_date ?? null;
+    if (expiry && expiry < Date.now()) {
+      return { loggedIn: false, requiresAuth: true, account: null, tokenExpired: true };
+    }
+  } catch {
+    return { loggedIn: false, requiresAuth: true, account: null };
+  }
+  if (!fs.existsSync(accountsFile)) {
+    return { loggedIn: false, requiresAuth: true, account: null };
+  }
+  try {
     const accounts = JSON.parse(fs.readFileSync(accountsFile, "utf8"));
     return {
       loggedIn: Boolean(accounts?.active),
@@ -80,9 +92,11 @@ export async function runAntigravityTurn(workspaceRoot, { prompt, resumeLast, co
       stderr += chunk;
     });
 
-    proc.on("close", () => {
+    proc.on("close", (code) => {
       const threadId = readLastConversationId(workspaceRoot);
-      const failed = !stdout.trim() && stderr.trim();
+      // agy normally exits 0, but crashes (OOM, SIGKILL) produce non-zero codes.
+      // Also treat empty stdout + non-empty stderr as failure for the common error case.
+      const failed = (code !== 0 && code !== null) || (!stdout.trim() && stderr.trim());
       resolve({
         status: failed ? 1 : 0,
         finalMessage: stdout,

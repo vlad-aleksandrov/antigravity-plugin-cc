@@ -102,7 +102,9 @@ function runStopReview(cwd, input = {}) {
     ...process.env,
     ...(input.session_id ? { [SESSION_ID_ENV]: input.session_id } : {})
   };
-  const result = spawnSync(process.execPath, [scriptPath, "task", "--json", prompt], {
+  // Pass prompt via stdin to avoid OS ARG_MAX limits when last_assistant_message is large.
+  const result = spawnSync(process.execPath, [scriptPath, "task", "--json"], {
+    input: prompt,
     cwd,
     env: childEnv,
     encoding: "utf8",

@@ -6,7 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { parseArgs, splitRawArgumentString } from "./lib/args.mjs";
+import { parseArgs } from "./lib/args.mjs";
 import {
   getAntigravityAuthStatus,
   getAntigravityAvailability,
@@ -35,6 +35,7 @@ import {
   renderTaskResult
 } from "./lib/render.mjs";
 import {
+  generateJobId,
   getConfig,
   listJobs,
   readJobFile,
@@ -85,7 +86,11 @@ async function buildSetupReport(cwd, options = {}) {
   if (!agyStatus.available) {
     nextSteps.push(`Install agy: ${agyStatus.detail}`);
   } else if (!authStatus.loggedIn) {
-    nextSteps.push("Run `agy` once interactively to complete Google OAuth authentication.");
+    if (authStatus.tokenExpired) {
+      nextSteps.push("OAuth token has expired. Run `agy` once interactively to refresh Google authentication.");
+    } else {
+      nextSteps.push("Run `agy` once interactively to complete Google OAuth authentication.");
+    }
   }
 
   return {
@@ -95,7 +100,9 @@ async function buildSetupReport(cwd, options = {}) {
     auth: {
       detail: authStatus.loggedIn
         ? `Google account active${authStatus.account ? ` (${authStatus.account})` : ""}`
-        : "not authenticated"
+        : authStatus.tokenExpired
+          ? "token expired — re-authenticate by running `agy` interactively"
+          : "not authenticated"
     },
     reviewGateEnabled: getConfig(workspaceRoot).stopReviewGate,
     actionsTaken,
@@ -188,7 +195,11 @@ async function resolveLatestTrackedTaskThread(cwd, options = {}) {
     );
   }
 
-  const latestTask = jobs.find((j) => j.jobClass === "task" && j.threadId);
+  const currentSessionId = options.sessionId ?? process.env[SESSION_ID_ENV] ?? null;
+  const latestTask = jobs.find(
+    (j) => j.jobClass === "task" && j.threadId &&
+      (!currentSessionId || j.sessionId === currentSessionId)
+  );
   return latestTask ? { id: latestTask.threadId } : null;
 }
 
@@ -227,7 +238,7 @@ async function handleReview(argv, reviewName) {
   };
 
   const kindLabel = reviewName === "Review" ? "review" : "adversarial-review";
-  const jobId = `${kindLabel === "review" ? "rev" : "adv"}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const jobId = generateJobId(kindLabel === "review" ? "rev" : "adv");
   const jobRecord = createJobRecord({
     id: jobId,
     workspaceRoot,
@@ -282,7 +293,7 @@ async function handleTask(argv) {
     }
   }
 
-  const jobId = `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const jobId = generateJobId("task");
   const jobRecord = createJobRecord({
     id: jobId,
     workspaceRoot,
@@ -304,7 +315,7 @@ async function handleTask(argv) {
       conversationId,
       onProgress: reporter
     });
-    const rendered = renderTaskResult({ rawOutput: result.finalMessage }, {});
+    const rendered = renderTaskResult({ rawOutput: result.finalMessage, failureMessage: result.stderr }, {});
     return {
       exitStatus: result.status,
       threadId: result.threadId,
@@ -319,7 +330,7 @@ async function handleTask(argv) {
   const execution = await runTrackedJob({ ...jobRecord, workspaceRoot }, runner, { logFile });
 
   if (options.json) {
-    process.stdout.write(`${JSON.stringify({ jobId, rawOutput: execution.rawOutput })}\n`);
+    process.stdout.write(`${JSON.stringify({ jobId, rawOutput: execution.rawOutput, rendered: execution.rendered })}\n`);
   } else {
     process.stdout.write(execution.rendered ?? "");
   }
