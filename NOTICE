@@ -1,0 +1,9 @@
+Antigravity Plugin for Claude Code
+Copyright 2025 Google DeepMind
+
+This product is a port of the OpenAI Codex Plugin for Claude Code
+(https://github.com/openai/codex-plugin-cc), adapted to use the
+Antigravity (agy) CLI as the backend.
+
+Original work Copyright 2025 OpenAI, licensed under the Apache License,
+Version 2.0.
