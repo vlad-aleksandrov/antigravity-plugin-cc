@@ -1,0 +1,21 @@
+{
+  "name": "antigravity",
+  "owner": {
+    "name": "Google DeepMind"
+  },
+  "metadata": {
+    "description": "Antigravity plugins to use in Claude Code for delegation and code review.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "antigravity",
+      "description": "Use Antigravity from Claude Code to review code or delegate tasks.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Google DeepMind"
+      },
+      "source": "./plugins/antigravity"
+    }
+  ]
+}
