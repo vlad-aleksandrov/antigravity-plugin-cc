@@ -183,19 +183,24 @@ async function executeReviewRun(cwd, reviewName, options = {}) {
   throw new Error(`Unknown review type: ${reviewName}`);
 }
 
-async function resolveLatestTrackedTaskThread(cwd, options = {}) {
+function resolveLatestTrackedTaskThread(cwd, options = {}) {
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   const jobs = sortJobsNewestFirst(listJobs(workspaceRoot));
 
-  const runningJob = jobs.find((j) => j.sessionId === (options.sessionId ?? process.env[SESSION_ID_ENV]) &&
-    (j.status === "queued" || j.status === "running"));
+  // Use `||` (not `??`) so an empty-string env var falls through to null,
+  // which causes the latestTask filter to match all sessions (no-session behaviour).
+  const currentSessionId = options.sessionId || process.env[SESSION_ID_ENV] || null;
+
+  const runningJob = jobs.find((j) =>
+    j.sessionId === currentSessionId &&
+    (j.status === "queued" || j.status === "running")
+  );
   if (runningJob) {
     throw new Error(
       `Antigravity job ${runningJob.id} is still ${runningJob.status}. Check /antigravity:status or cancel it before resuming.`
     );
   }
 
-  const currentSessionId = options.sessionId ?? process.env[SESSION_ID_ENV] ?? null;
   const latestTask = jobs.find(
     (j) => j.jobClass === "task" && j.threadId &&
       (!currentSessionId || j.sessionId === currentSessionId)
@@ -253,7 +258,7 @@ async function handleReview(argv, reviewName) {
   const updateProgress = createJobProgressUpdater(workspaceRoot, jobId);
   const reporter = createProgressReporter({ stderr: true, logFile, onEvent: updateProgress });
 
-  const execution = await runTrackedJob({ ...jobRecord, workspaceRoot }, async () => {
+  const execution = await runTrackedJob(jobRecord, async () => {
     return executeReviewRun(cwd, reviewName, { ...reviewOptions, onProgress: reporter });
   }, { logFile });
 
@@ -285,7 +290,7 @@ async function handleTask(argv) {
   let resumeLast = false;
 
   if (options["resume-last"]) {
-    const thread = await resolveLatestTrackedTaskThread(cwd);
+    const thread = resolveLatestTrackedTaskThread(cwd);
     if (thread) {
       conversationId = thread.id;
     } else {
@@ -327,7 +332,7 @@ async function handleTask(argv) {
     };
   };
 
-  const execution = await runTrackedJob({ ...jobRecord, workspaceRoot }, runner, { logFile });
+  const execution = await runTrackedJob(jobRecord, runner, { logFile });
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify({ jobId, rawOutput: execution.rawOutput, rendered: execution.rendered })}\n`);

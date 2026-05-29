@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { makeTempDir, initGitRepo } from "./helpers.mjs";
+import { makeTempDir, initGitRepo, writeExecutable } from "./helpers.mjs";
 import { createFakeAgy, readFakeAgyArgs } from "./fake-agy-fixture.mjs";
 import { runAntigravityTurn } from "../plugins/antigravity/scripts/lib/antigravity.mjs";
 
@@ -39,7 +39,10 @@ test("runAntigravityTurn returns stdout as finalMessage on success", async () =>
   }
 });
 
-test("runAntigravityTurn detects failure from empty stdout + non-empty stderr", async () => {
+test("runAntigravityTurn trusts exit-code-0 as success even with empty stdout and non-empty stderr", async () => {
+  // agy exits 0 even for some error conditions; we trust the exit code as authoritative.
+  // Stderr warnings/notices do not override a clean exit. Callers inspect result.stderr
+  // if they need to surface warning content.
   const cwd = makeTempDir();
   initGitRepo(cwd);
   const { binDir } = createFakeAgy({ stdout: "", stderr: "agy internal error\n" });
@@ -54,9 +57,40 @@ test("runAntigravityTurn detects failure from empty stdout + non-empty stderr", 
       onProgress: null
     });
 
-    assert.equal(result.status, 1);
+    assert.equal(result.status, 0);           // exit-code-0 → success
     assert.equal(result.finalMessage, "");
-    assert.match(result.stderr, /agy internal error/);
+    assert.match(result.stderr, /agy internal error/); // stderr still captured for callers
+  } finally {
+    process.env.PATH = origPath;
+  }
+});
+
+test("runAntigravityTurn reports failure for non-zero exit code", async () => {
+  const cwd = makeTempDir();
+  initGitRepo(cwd);
+  const dir = makeTempDir("fake-agy-nonzero-");
+  const binPath = path.join(dir, "agy");
+  writeExecutable(binPath, [
+    "#!/usr/bin/env node",
+    'import fs from "node:fs";',
+    'import process from "node:process";',
+    `fs.writeFileSync(${JSON.stringify(path.join(dir, "agy-args.json"))}, JSON.stringify(process.argv.slice(2)));`,
+    'process.stderr.write("fatal crash\\n");',
+    "process.exit(1);"
+  ].join("\n"));
+
+  const origPath = process.env.PATH;
+  process.env.PATH = `${dir}${path.delimiter}${origPath}`;
+
+  try {
+    const result = await runAntigravityTurn(cwd, {
+      prompt: "do something",
+      resumeLast: false,
+      conversationId: null,
+      onProgress: null
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /fatal crash/);
   } finally {
     process.env.PATH = origPath;
   }

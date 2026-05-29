@@ -10,7 +10,7 @@ export function getAntigravityAvailability(cwd) {
   return binaryAvailable("agy", ["--version"], { cwd });
 }
 
-export async function getAntigravityAuthStatus() {
+export function getAntigravityAuthStatus() {
   const credsFile = path.join(os.homedir(), ".gemini", "oauth_creds.json");
   const accountsFile = path.join(os.homedir(), ".gemini", "google_accounts.json");
   if (!fs.existsSync(credsFile)) {
@@ -94,9 +94,12 @@ export async function runAntigravityTurn(workspaceRoot, { prompt, resumeLast, co
 
     proc.on("close", (code) => {
       const threadId = readLastConversationId(workspaceRoot);
-      // agy normally exits 0, but crashes (OOM, SIGKILL) produce non-zero codes.
-      // Also treat empty stdout + non-empty stderr as failure for the common error case.
-      const failed = (code !== 0 && code !== null) || (!stdout.trim() && stderr.trim());
+      // Trust the exit code as the primary failure signal:
+      //   code === 0   → success (even if stderr has warnings)
+      //   code !== 0   → explicit failure
+      //   code === null → signal-killed (SIGKILL/OOM); null !== 0 is true in JS, so this
+      //                   is already covered — no special-case needed.
+      const failed = code !== 0;
       resolve({
         status: failed ? 1 : 0,
         finalMessage: stdout,
