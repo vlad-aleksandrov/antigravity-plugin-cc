@@ -1,3 +1,10 @@
+---
+description: Show active and recent Antigravity jobs for this repository, including review-gate status
+argument-hint: '[job-id] [--wait] [--timeout-ms <ms>] [--all]'
+disable-model-invocation: true
+allowed-tools: Bash(node:*)
+---
+
 Display active and recent Antigravity jobs for this repository, including review-gate status.
 
 ```

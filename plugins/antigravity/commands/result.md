@@ -1,3 +1,10 @@
+---
+description: Show the stored final output for a finished Antigravity job in this repository
+argument-hint: '[job-id]'
+disable-model-invocation: true
+allowed-tools: Bash(node:*)
+---
+
 Display the final output from a completed Antigravity job stored in this repository.
 
 ```

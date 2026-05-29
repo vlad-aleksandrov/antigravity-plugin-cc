@@ -131,21 +131,29 @@ export function parseStructuredOutput(rawOutput, fallback = {}) {
     };
   }
 
-  try {
-    return {
-      parsed: JSON.parse(rawOutput),
-      parseError: null,
-      rawOutput,
-      ...fallback
-    };
-  } catch (error) {
-    return {
-      parsed: null,
-      parseError: error.message,
-      rawOutput,
-      ...fallback
-    };
+  const text = rawOutput.trim();
+
+  // Try raw text first, then any markdown-fenced blocks (Gemini wraps JSON in ```json...```)
+  const candidates = [text];
+  for (const match of text.matchAll(/```(?:json)?\s*\n([\s\S]*?)\n```/g)) {
+    candidates.push(match[1].trim());
   }
+
+  for (const candidate of candidates) {
+    try {
+      return { parsed: JSON.parse(candidate), parseError: null, rawOutput, ...fallback };
+    } catch {
+      // try next candidate
+    }
+  }
+
+  let parseError = "unknown parse error";
+  try {
+    JSON.parse(text);
+  } catch (err) {
+    parseError = err.message;
+  }
+  return { parsed: null, parseError, rawOutput, ...fallback };
 }
 
 export function readOutputSchema(schemaPath) {

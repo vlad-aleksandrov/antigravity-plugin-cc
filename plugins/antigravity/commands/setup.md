@@ -1,3 +1,9 @@
+---
+description: Check whether the local Antigravity CLI is ready and optionally toggle the stop-time review gate
+argument-hint: '[--enable-review-gate|--disable-review-gate]'
+allowed-tools: Bash(node:*), AskUserQuestion
+---
+
 Check whether the local Antigravity CLI is ready and manage the stop-time review gate.
 
 Run:

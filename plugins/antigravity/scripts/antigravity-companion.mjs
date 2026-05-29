@@ -39,7 +39,8 @@ import {
   listJobs,
   readJobFile,
   resolveJobFile,
-  setConfig
+  setConfig,
+  upsertJob
 } from "./lib/state.mjs";
 import {
   SESSION_ID_ENV,
@@ -50,24 +51,13 @@ import {
   runTrackedJob
 } from "./lib/tracked-jobs.mjs";
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
-import { binaryAvailable } from "./lib/process.mjs";
-import { terminateProcessTree } from "./lib/process.mjs";
+import { binaryAvailable, terminateProcessTree } from "./lib/process.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "..");
 
 const POLL_INTERVAL_MS = 2000;
 const DEFAULT_STATUS_TIMEOUT_MS = 0;
-
-function readHookInput() {
-  try {
-    const raw = fs.readFileSync(0, "utf8").trim();
-    if (!raw) return {};
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-}
 
 function getNodeAvailability() {
   return binaryAvailable("node", ["--version"]);
@@ -236,46 +226,13 @@ async function handleReview(argv, reviewName) {
     focus
   };
 
-  const isBackground = options.background && !options.wait;
-
-  if (isBackground) {
-    const jobId = `${reviewName === "Review" ? "rev" : "adv"}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    const kindLabel = reviewName === "Review" ? "review" : "adversarial-review";
-    const jobRecord = createJobRecord({
-      id: jobId,
-      workspaceRoot,
-      jobClass: "review",
-      kind: reviewName === "Review" ? "review" : "adversarial-review",
-      kindLabel,
-      title: `Antigravity ${reviewName}`,
-      status: "queued",
-      write: false
-    });
-    const logFile = createJobLogFile(workspaceRoot, jobId, `Antigravity ${reviewName}`);
-    const updateProgress = createJobProgressUpdater(workspaceRoot, jobId);
-    const reporter = createProgressReporter({ stderr: true, logFile, onEvent: updateProgress });
-
-    setImmediate(async () => {
-      await runTrackedJob({ ...jobRecord, workspaceRoot }, async () => {
-        return executeReviewRun(cwd, reviewName, { ...reviewOptions, onProgress: reporter });
-      }, { logFile });
-    });
-
-    if (options.json) {
-      process.stdout.write(`${JSON.stringify({ jobId, status: "queued" })}\n`);
-    } else {
-      process.stdout.write(`Antigravity ${reviewName} queued as job ${jobId}. Check /antigravity:status ${jobId}.\n`);
-    }
-    return 0;
-  }
-
-  const jobId = `${reviewName === "Review" ? "rev" : "adv"}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const kindLabel = reviewName === "Review" ? "review" : "adversarial-review";
+  const jobId = `${kindLabel === "review" ? "rev" : "adv"}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const jobRecord = createJobRecord({
     id: jobId,
     workspaceRoot,
     jobClass: "review",
-    kind: reviewName === "Review" ? "review" : "adversarial-review",
+    kind: kindLabel,
     kindLabel,
     title: `Antigravity ${reviewName}`,
     status: "queued",
@@ -325,7 +282,6 @@ async function handleTask(argv) {
     }
   }
 
-  const isBackground = options.background && !options.wait;
   const jobId = `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const jobRecord = createJobRecord({
     id: jobId,
@@ -359,19 +315,6 @@ async function handleTask(argv) {
       payload: { rawOutput: result.finalMessage }
     };
   };
-
-  if (isBackground) {
-    setImmediate(async () => {
-      await runTrackedJob({ ...jobRecord, workspaceRoot }, runner, { logFile });
-    });
-
-    if (options.json) {
-      process.stdout.write(`${JSON.stringify({ jobId, status: "queued" })}\n`);
-    } else {
-      process.stdout.write(`Antigravity task queued as job ${jobId}. Check /antigravity:status ${jobId}.\n`);
-    }
-    return 0;
-  }
 
   const execution = await runTrackedJob({ ...jobRecord, workspaceRoot }, runner, { logFile });
 
@@ -468,7 +411,6 @@ async function handleCancel(argv) {
   }
 
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  const { upsertJob } = await import("./lib/state.mjs");
   upsertJob(workspaceRoot, { id: job.id, status: "cancelled" });
 
   if (options.json) {

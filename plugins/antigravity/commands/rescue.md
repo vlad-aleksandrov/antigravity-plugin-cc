@@ -1,3 +1,9 @@
+---
+description: Delegate investigation, an explicit fix request, or follow-up rescue work to the Antigravity rescue subagent
+argument-hint: '[--background|--wait] [--resume|--fresh] [what Antigravity should investigate, solve, or continue]'
+allowed-tools: Bash(node:*), AskUserQuestion, Agent
+---
+
 Delegate an investigation, implementation, or follow-up task to Antigravity (`agy`).
 
 Use the `Agent` tool with `subagent_type: "antigravity:antigravity-rescue"`, forwarding the raw user request as the prompt. Do not call it as a skill.

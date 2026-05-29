@@ -134,43 +134,33 @@ test("runAntigravityTurn passes --dangerously-skip-permissions on every call", a
 });
 
 test("runAntigravityTurn reads threadId from last_conversations.json", async () => {
-  const cwd = makeTempDir();
-  initGitRepo(cwd);
+  // Use a temp home dir so the test never touches the real ~/.gemini directory.
+  const workspaceRoot = makeTempDir();
+  initGitRepo(workspaceRoot);
   const { binDir } = createFakeAgy({ stdout: "done\n" });
 
-  const convCacheDir = path.join(os.homedir(), ".gemini", "antigravity-cli", "cache");
+  const fakeHome = makeTempDir("fake-home-");
+  const convCacheDir = path.join(fakeHome, ".gemini", "antigravity-cli", "cache");
+  fs.mkdirSync(convCacheDir, { recursive: true });
   const convFile = path.join(convCacheDir, "last_conversations.json");
-  const workspaceRoot = cwd;
-  let origContent = null;
+  fs.writeFileSync(convFile, JSON.stringify({ [workspaceRoot]: "conv-uuid-abc123" }), "utf8");
+
+  const origPath = process.env.PATH;
+  const origHome = process.env.HOME;
+  process.env.PATH = `${binDir}${path.delimiter}${origPath}`;
+  process.env.HOME = fakeHome;
 
   try {
-    fs.mkdirSync(convCacheDir, { recursive: true });
-    if (fs.existsSync(convFile)) {
-      origContent = fs.readFileSync(convFile, "utf8");
-    }
-    const conversations = { [workspaceRoot]: "conv-uuid-abc123" };
-    fs.writeFileSync(convFile, JSON.stringify(conversations), "utf8");
+    const result = await runAntigravityTurn(workspaceRoot, {
+      prompt: "run task",
+      resumeLast: false,
+      conversationId: null,
+      onProgress: null
+    });
 
-    const origPath = process.env.PATH;
-    process.env.PATH = `${binDir}${path.delimiter}${origPath}`;
-
-    try {
-      const result = await runAntigravityTurn(workspaceRoot, {
-        prompt: "run task",
-        resumeLast: false,
-        conversationId: null,
-        onProgress: null
-      });
-
-      assert.equal(result.threadId, "conv-uuid-abc123");
-    } finally {
-      process.env.PATH = origPath;
-    }
+    assert.equal(result.threadId, "conv-uuid-abc123");
   } finally {
-    if (origContent !== null) {
-      fs.writeFileSync(convFile, origContent, "utf8");
-    } else if (fs.existsSync(convFile)) {
-      fs.unlinkSync(convFile);
-    }
+    process.env.PATH = origPath;
+    process.env.HOME = origHome;
   }
 });
