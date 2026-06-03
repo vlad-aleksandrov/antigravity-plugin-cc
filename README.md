@@ -26,7 +26,7 @@ Add the marketplace in Claude Code:
 Install the plugin:
 
 ```bash
-/plugin install antigravity@antigravity
+/plugin install antigravity@antigravity-plugin-cc
 ```
 
 Reload plugins:
