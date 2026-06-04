@@ -235,7 +235,7 @@ async function handleReview(argv, reviewName) {
 
   const cwd = process.cwd();
   const workspaceRoot = resolveWorkspaceRoot(cwd);
-  const focus = options.focus ?? positionals.join(" ").trim() || null;
+  const focus = options.focus ?? (positionals.join(" ").trim() || null);
   const reviewOptions = {
     scope: options.scope,
     base: options.base,
