@@ -15,33 +15,30 @@ This plugin is for Claude Code users who want an easy way to start using Antigra
 - **Antigravity CLI (`agy`) installed and authenticated via Google OAuth.**
 - **Node.js 18.18 or later**
 
-## Install
+## Setup
 
-Add the marketplace in Claude Code:
+**Prerequisites**
+- `agy` CLI installed and authenticated via Google OAuth
+- Node.js 18.18+
 
-```bash
-/plugin marketplace add vlad-aleksandrov/antigravity-plugin-cc
-```
+**Install**
 
-Install the plugin:
-
-```bash
-/plugin install antigravity@antigravity-plugin-cc
-```
-
-Reload plugins:
-
-```bash
-/reload-plugins
-```
-
-Then run:
-
-```bash
-/antigravity:setup
-```
-
-`/antigravity:setup` will tell you whether Antigravity is ready.
+1. Add the marketplace:
+   ```bash
+   /plugin marketplace add vlad-aleksandrov/antigravity-plugin-cc
+   ```
+2. Install the plugin:
+   ```bash
+   /plugin install antigravity@antigravity-plugin-cc
+   ```
+3. Reload:
+   ```bash
+   /reload-plugins
+   ```
+4. Check readiness:
+   ```bash
+   /antigravity:setup
+   ```
 
 If `agy` is installed but not yet authenticated, run it once interactively to complete Google OAuth:
 
@@ -49,18 +46,30 @@ If `agy` is installed but not yet authenticated, run it once interactively to co
 agy
 ```
 
-After install, you should see:
+**Verify**
 
+After install you should see:
 - the slash commands listed below
-- the `antigravity:antigravity-rescue` subagent in `/agents`
+- `antigravity:antigravity-rescue` in `/agents`
 
-One simple first run is:
+One simple first run:
 
 ```bash
 /antigravity:review --background
 /antigravity:status
 /antigravity:result
 ```
+
+**Optional — review gate**
+
+```bash
+/antigravity:setup --enable-review-gate
+```
+
+Registers a `Stop` hook that runs a targeted review of Claude's last response before the session ends. Holds the stop if blocking issues are found.
+
+> [!WARNING]
+> The review gate can create a long-running Claude/Antigravity loop. Only enable it when actively monitoring the session.
 
 ## Usage
 
