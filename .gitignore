@@ -142,3 +142,6 @@ vite.config.ts.timestamp-*
 .vite/
 
 output/
+
+# JetBrains IDE
+.idea/
