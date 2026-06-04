@@ -19,7 +19,8 @@ export function getAntigravityAuthStatus() {
   try {
     const creds = JSON.parse(fs.readFileSync(credsFile, "utf8"));
     const expiry = creds?.expiry_date ?? null;
-    if (expiry && expiry < Date.now()) {
+    const hasRefreshToken = Boolean(creds?.refresh_token);
+    if (expiry && expiry < Date.now() && !hasRefreshToken) {
       return { loggedIn: false, requiresAuth: true, account: null, tokenExpired: true };
     }
   } catch {
