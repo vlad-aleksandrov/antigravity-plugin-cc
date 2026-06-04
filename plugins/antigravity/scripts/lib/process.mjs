@@ -55,7 +55,7 @@ function looksLikeMissingProcessMessage(text) {
 }
 
 export function terminateProcessTree(pid, options = {}) {
-  if (!Number.isFinite(pid)) {
+  if (!Number.isFinite(pid) || pid <= 1) {
     return { attempted: false, delivered: false, method: null };
   }
 

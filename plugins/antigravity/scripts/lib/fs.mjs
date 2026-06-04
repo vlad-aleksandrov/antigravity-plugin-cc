@@ -36,5 +36,9 @@ export function readStdinIfPiped() {
   if (process.stdin.isTTY) {
     return "";
   }
-  return fs.readFileSync(0, "utf8");
+  try {
+    return fs.readFileSync(0, "utf8");
+  } catch {
+    return "";
+  }
 }

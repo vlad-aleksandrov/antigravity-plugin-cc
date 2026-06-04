@@ -81,6 +81,9 @@ export async function runAntigravityTurn(workspaceRoot, { prompt, resumeLast, co
       stdio: ["ignore", "pipe", "pipe"]
     });
 
+    proc.stdout.setEncoding("utf8");
+    proc.stderr.setEncoding("utf8");
+
     let stdout = "";
     let stderr = "";
 

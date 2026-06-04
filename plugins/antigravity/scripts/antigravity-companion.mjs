@@ -41,7 +41,8 @@ import {
   readJobFile,
   resolveJobFile,
   setConfig,
-  upsertJob
+  upsertJob,
+  writeJobFile
 } from "./lib/state.mjs";
 import {
   SESSION_ID_ENV,
@@ -428,6 +429,16 @@ async function handleCancel(argv) {
 
   const workspaceRoot = resolveWorkspaceRoot(cwd);
   upsertJob(workspaceRoot, { id: job.id, status: "cancelled" });
+
+  const jobFile = resolveJobFile(workspaceRoot, job.id);
+  if (fs.existsSync(jobFile)) {
+    try {
+      const storedJob = readJobFile(jobFile);
+      writeJobFile(workspaceRoot, job.id, { ...storedJob, status: "cancelled", completedAt: new Date().toISOString() });
+    } catch {
+      // ignore write failures
+    }
+  }
 
   if (options.json) {
     process.stdout.write(`${JSON.stringify({ cancelled: true, jobId: job.id })}\n`);
