@@ -2,18 +2,44 @@
 
 Use Antigravity from inside Claude Code for code reviews or to delegate tasks to `agy`.
 
-This plugin is for Claude Code users who want an easy way to start using Antigravity from the workflow they already have.
+## Second Opinion Review
+
+The most useful thing about having Antigravity inside Claude Code isn't convenience — it's model diversity.
+
+Asking the model that wrote the code whether the code is correct is structurally limited. Claude Code reviews its own work with its own blind spots. It tends to validate what it already did, not because it's sycophantic, but because it shares the same assumptions and training tendencies that produced the original output.
+
+Antigravity runs Gemini. A model trained differently, by a different team, on different data. When you point it at code Claude Code just wrote and give it an adversarial brief, it approaches that code without Claude's baggage. It finds different things — not always more things, different things.
+
+The workflow is straightforward: let Claude Code build, then hand the diff to Antigravity before you ship.
+
+```bash
+# Claude Code writes the feature, then:
+/antigravity:review --background --focus "challenge error handling and edge cases"
+
+# Keep working — Antigravity runs in parallel
+/antigravity:status
+
+# Pull in the findings
+/antigravity:result
+```
+
+For higher-stakes changes, use `/antigravity:adversarial-review` for a structured verdict with severity-ranked findings.
+
+```bash
+/antigravity:adversarial-review --background --focus "look for race conditions and data loss paths"
+```
+
+If the review surfaces something serious and you want Antigravity to own the fix, delegate it:
+
+```bash
+/antigravity:rescue fix the issue found in the last review
+```
 
 ## What You Get
 
 - `/antigravity:review` for a normal read-only Antigravity review
 - `/antigravity:adversarial-review` for a steerable challenge review
 - `/antigravity:rescue`, `/antigravity:status`, `/antigravity:result`, and `/antigravity:cancel` to delegate work and manage background jobs
-
-## Requirements
-
-- **Antigravity CLI (`agy`) installed and authenticated via Google OAuth.**
-- **Node.js 18.18 or later**
 
 ## Setup
 
@@ -62,14 +88,7 @@ One simple first run:
 
 **Optional — review gate**
 
-```bash
-/antigravity:setup --enable-review-gate
-```
-
-Registers a `Stop` hook that runs a targeted review of Claude's last response before the session ends. Holds the stop if blocking issues are found.
-
-> [!WARNING]
-> The review gate can create a long-running Claude/Antigravity loop. Only enable it when actively monitoring the session.
+Run `/antigravity:setup --enable-review-gate` to register a stop-time review hook. See [`/antigravity:setup`](#antigravitysetup) for details and the usage warning.
 
 ## Usage
 
@@ -77,7 +96,7 @@ Registers a `Stop` hook that runs a targeted review of Claude's last response be
 
 Performs a standard, read-only code review on your local git state.
 
-Use it when you want a second pass on uncommitted working-tree changes before you commit, or when you want to audit everything on your feature branch relative to `main` before opening a PR.
+Use it when you want a second pass on uncommitted working-tree changes before you commit, or when you want to audit everything on your feature branch relative to `main` before opening an MR.
 
 How it works: the plugin collects your git status, staged and unstaged diffs, and untracked file contents. For small changesets the full diff is embedded directly in the prompt; for larger ones the model reads files via read-only tool calls inside its sandbox. The output is free-form Markdown covering logic bugs, missing edge cases, and safety concerns.
 
@@ -238,41 +257,6 @@ Then check in with:
 /antigravity:status
 /antigravity:result
 ```
-
-## Second Opinion Review
-
-The most useful thing about having Antigravity inside Claude Code isn't convenience — it's model diversity.
-
-Asking the model that wrote the code whether the code is correct is structurally limited. Claude Code reviews its own work with its own blind spots. It tends to validate what it already did, not because it's sycophantic, but because it shares the same assumptions and training tendencies that produced the original output.
-
-Antigravity runs Gemini. A model trained differently, by a different team, on different data. When you point it at code Claude Code just wrote and give it an adversarial brief, it approaches that code without Claude's baggage. It finds different things — not always more things, different things.
-
-The workflow is straightforward: let Claude Code build, then hand the diff to Antigravity before you ship.
-
-```bash
-# Claude Code writes the feature, then:
-/antigravity:review --background --focus "challenge error handling and edge cases"
-
-# Keep working — Antigravity runs in parallel
-/antigravity:status
-
-# Pull in the findings
-/antigravity:result
-```
-
-For higher-stakes changes, use `/antigravity:adversarial-review`. It enforces a structured output contract — verdict, severity-ranked findings, file locations, confidence scores — so the output is directly actionable rather than discursive.
-
-```bash
-/antigravity:adversarial-review --background --focus "look for race conditions and data loss paths"
-```
-
-If the review surfaces something serious and you want Antigravity to own the fix, delegate it:
-
-```bash
-/antigravity:rescue fix the issue found in the last review
-```
-
-The async design is what makes this practical. `/antigravity:review` and `/antigravity:rescue` both run in the background. You are not waiting for the review — you are working in parallel while Antigravity runs. `/antigravity:status` tells you when it is done; `/antigravity:result` brings the findings back.
 
 ## Antigravity Integration
 
