@@ -239,6 +239,41 @@ Then check in with:
 /antigravity:result
 ```
 
+## Second Opinion Review
+
+The most useful thing about having Antigravity inside Claude Code isn't convenience — it's model diversity.
+
+Asking the model that wrote the code whether the code is correct is structurally limited. Claude Code reviews its own work with its own blind spots. It tends to validate what it already did, not because it's sycophantic, but because it shares the same assumptions and training tendencies that produced the original output.
+
+Antigravity runs Gemini. A model trained differently, by a different team, on different data. When you point it at code Claude Code just wrote and give it an adversarial brief, it approaches that code without Claude's baggage. It finds different things — not always more things, different things.
+
+The workflow is straightforward: let Claude Code build, then hand the diff to Antigravity before you ship.
+
+```bash
+# Claude Code writes the feature, then:
+/antigravity:review --background --focus "challenge error handling and edge cases"
+
+# Keep working — Antigravity runs in parallel
+/antigravity:status
+
+# Pull in the findings
+/antigravity:result
+```
+
+For higher-stakes changes, use `/antigravity:adversarial-review`. It enforces a structured output contract — verdict, severity-ranked findings, file locations, confidence scores — so the output is directly actionable rather than discursive.
+
+```bash
+/antigravity:adversarial-review --background --focus "look for race conditions and data loss paths"
+```
+
+If the review surfaces something serious and you want Antigravity to own the fix, delegate it:
+
+```bash
+/antigravity:rescue fix the issue found in the last review
+```
+
+The async design is what makes this practical. `/antigravity:review` and `/antigravity:rescue` both run in the background. You are not waiting for the review — you are working in parallel while Antigravity runs. `/antigravity:status` tells you when it is done; `/antigravity:result` brings the findings back.
+
 ## Antigravity Integration
 
 The Antigravity plugin wraps the local `agy` binary installed in your environment. It uses your existing Google OAuth credentials and runs in the context of the current repository.
